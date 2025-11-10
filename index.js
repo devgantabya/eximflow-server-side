@@ -24,11 +24,21 @@ async function run() {
         const db = client.db("exim_db");
         const productCollection = db.collection("products");
         const usersCollection = db.collection("users");
+        const importsCollection = db.collection("imports");
 
-        app.post("/users", async (req, res) => {
+        app.post('/users', async (req, res) => {
             const newUser = req.body;
-            const result = await usersCollection.insertOne(newUser);
-            res.send(result);
+            const email = req.body.email;
+            const query = { email: email }
+            const existingUser = await usersCollection.findOne(query);
+
+            if (existingUser) {
+                res.send({ message: 'user already exits. do not need to insert again' })
+            }
+            else {
+                const result = await usersCollection.insertOne(newUser);
+                res.send(result);
+            }
         })
 
         app.get("/products", async (req, res) => {
@@ -38,6 +48,12 @@ async function run() {
                 query.email = email;
             }
             const cursor = productCollection.find(query);
+            const result = await cursor.toArray();
+            res.send(result);
+        })
+
+        app.get('/latest-products', async (req, res) => {
+            const cursor = productCollection.find().sort({ created_at: -1 }).limit(6);
             const result = await cursor.toArray();
             res.send(result);
         })
@@ -70,12 +86,53 @@ async function run() {
             res.send(result);
         })
 
+        app.patch("/products/:id/reduce", async (req, res) => {
+            const id = req.params.id;
+            const { reduceBy } = req.body;
+            const query = { _id: new ObjectId(id) };
+            const update = { $inc: { available_quantity: -reduceBy } };
+            const result = await productCollection.updateOne(query, update);
+            res.send(result);
+        });
+
         app.delete("/products/:id", async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await productCollection.deleteOne(query);
             res.send(result);
         })
+
+        app.get("/myImports", async (req, res) => {
+            const email = req.query.email;
+            const query = email ? { importer_email: email } : {};
+            const result = await importsCollection.find(query).toArray();
+            res.send(result);
+        });
+
+        app.post("/myImports", async (req, res) => {
+            const newImport = req.body;
+            const result = await importsCollection.insertOne(newImport);
+            res.send(result);
+        });
+
+        app.patch("/myImports/:id", async (req, res) => {
+            const id = req.params.id;
+            const { imported_quantity } = req.body;
+
+            const result = await importsCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { imported_quantity } }
+            );
+            res.send(result);
+        });
+
+        app.delete("/myImports/:id", async (req, res) => {
+            const id = req.params.id;
+            const result = await importsCollection.deleteOne({ _id: new ObjectId(id) });
+            res.send(result);
+        });
+
+
 
 
         // Send a ping to confirm a successful connection
