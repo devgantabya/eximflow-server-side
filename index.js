@@ -133,20 +133,47 @@ async function run() {
             res.send(result);
         });
 
-        app.get("/myExports", async (req, res) => {
+        app.get("/exports", async (req, res) => {
             const email = req.query.email;
             const query = email ? { exporter_email: email } : {};
-            const result = await exportsCollection.find(query).toArray();
-            res.send(result);
+            const exportsData = await exportsCollection.find(query).toArray();
+            res.send(exportsData);
         });
 
         app.post("/exports", async (req, res) => {
             const newExport = req.body;
             newExport.created_at = new Date();
 
-            const result = await exportsCollection.insertOne(newExport);
-            res.send(result);
+            try {
+                const exportResult = await exportsCollection.insertOne(newExport);
+
+                const productData = {
+                    title: newExport.product_name,
+                    image: newExport.product_image,
+                    price: newExport.price,
+                    email: newExport.exporter_email,
+                    category: "Exports",
+                    created_at: newExport.created_at,
+                    origin_country: newExport.origin_country,
+                    rating: newExport.rating,
+                    available_quantity: newExport.available_quantity,
+                    location: newExport.origin_country,
+                };
+
+                const productResult = await productCollection.insertOne(productData);
+
+                res.send({
+                    success: true,
+                    message: "Export product added successfully!",
+                    exportResult,
+                    productResult,
+                });
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ success: false, message: "Failed to add export product." });
+            }
         });
+
 
         app.patch("/myExports/:id", async (req, res) => {
             const id = req.params.id;
@@ -168,8 +195,12 @@ async function run() {
             res.send(result);
         });
 
-
-
+        app.delete("/myExports/:id", async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await exportsCollection.deleteOne(query);
+            res.send(result);
+        });
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
