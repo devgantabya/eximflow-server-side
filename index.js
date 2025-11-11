@@ -148,6 +148,26 @@ async function run() {
             res.send(result);
         });
 
+        app.patch("/myExports/:id", async (req, res) => {
+            const id = req.params.id;
+            const updatedData = req.body;
+            const query = { _id: new ObjectId(id) };
+
+            const updateDoc = {
+                $set: {
+                    product_name: updatedData.product_name,
+                    product_image: updatedData.product_image,
+                    price: updatedData.price,
+                    origin_country: updatedData.origin_country,
+                    rating: updatedData.rating,
+                    available_quantity: updatedData.available_quantity,
+                },
+            };
+
+            const result = await exportsCollection.updateOne(query, updateDoc);
+            res.send(result);
+        });
+
 
 
 
