@@ -25,6 +25,7 @@ async function run() {
         const productCollection = db.collection("products");
         const usersCollection = db.collection("users");
         const importsCollection = db.collection("imports");
+        const exportsCollection = db.collection("exports");
 
         app.post('/users', async (req, res) => {
             const newUser = req.body;
@@ -129,6 +130,21 @@ async function run() {
         app.delete("/myImports/:id", async (req, res) => {
             const id = req.params.id;
             const result = await importsCollection.deleteOne({ _id: new ObjectId(id) });
+            res.send(result);
+        });
+
+        app.get("/myExports", async (req, res) => {
+            const email = req.query.email;
+            const query = email ? { exporter_email: email } : {};
+            const result = await exportsCollection.find(query).toArray();
+            res.send(result);
+        });
+
+        app.post("/exports", async (req, res) => {
+            const newExport = req.body;
+            newExport.created_at = new Date();
+
+            const result = await exportsCollection.insertOne(newExport);
             res.send(result);
         });
 
