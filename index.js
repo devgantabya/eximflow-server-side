@@ -146,7 +146,6 @@ async function run() {
 
             try {
                 const exportResult = await exportsCollection.insertOne(newExport);
-
                 const productData = {
                     title: newExport.product_name,
                     image: newExport.product_image,
@@ -159,10 +158,14 @@ async function run() {
                     available_quantity: newExport.available_quantity,
                     location: newExport.address,
                 };
-
                 const productResult = await productCollection.insertOne(productData);
 
-                res.send({
+                await exportsCollection.updateOne(
+                    { _id: exportResult.insertedId },
+                    { $set: { product_id: productResult.insertedId } }
+                );
+
+                res.status(201).send({
                     success: true,
                     message: "Export product added successfully!",
                     exportResult,
@@ -174,13 +177,11 @@ async function run() {
             }
         });
 
-
         app.patch("/myExports/:id", async (req, res) => {
             const id = req.params.id;
             const updatedData = req.body;
             const query = { _id: new ObjectId(id) };
-
-            const updateDoc = {
+            const exportUpdateResult = await exportsCollection.updateOne(query, {
                 $set: {
                     product_name: updatedData.product_name,
                     product_image: updatedData.product_image,
@@ -189,20 +190,63 @@ async function run() {
                     rating: updatedData.rating,
                     available_quantity: updatedData.available_quantity,
                 },
-            };
+            });
 
-            const result = await exportsCollection.updateOne(query, updateDoc);
-            res.send(result);
+
+            const exportDoc = await exportsCollection.findOne(query);
+            const productId = exportDoc?.product_id;
+
+            if (productId) {
+                await productCollection.updateOne(
+                    { _id: new ObjectId(productId) },
+                    {
+                        $set: {
+                            title: updatedData.product_name,
+                            image: updatedData.product_image,
+                            price: updatedData.price,
+                            origin_country: updatedData.origin_country,
+                            rating: updatedData.rating,
+                            available_quantity: updatedData.available_quantity,
+                            category: updatedData.product_category,
+                            location: updatedData.address,
+                        },
+                    }
+                );
+
+                await importsCollection.updateMany(
+                    { product_id: new ObjectId(productId) },
+                    {
+                        $set: {
+                            title: updatedData.product_name,
+                            image: updatedData.product_image,
+                            price: updatedData.price,
+                            origin_country: updatedData.origin_country,
+                            rating: updatedData.rating,
+                        },
+                    }
+                );
+            }
+
+            res.send(exportUpdateResult);
         });
 
         app.delete("/myExports/:id", async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
-            const result = await exportsCollection.deleteOne(query);
-            res.send(result);
+
+            const exportDoc = await exportsCollection.findOne(query);
+            const productId = exportDoc?.product_id;
+
+            const exportDeleteResult = await exportsCollection.deleteOne(query);
+
+            if (exportDeleteResult.deletedCount > 0 && productId) {
+                await productCollection.deleteOne({ _id: new ObjectId(productId) });
+                await importsCollection.deleteMany({ product_id: new ObjectId(productId) });
+            }
+
+            res.send(exportDeleteResult);
         });
 
-        // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
