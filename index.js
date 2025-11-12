@@ -152,12 +152,12 @@ async function run() {
                     image: newExport.product_image,
                     price: newExport.price,
                     email: newExport.exporter_email,
-                    category: "Exports",
+                    category: newExport.product_category,
                     created_at: newExport.created_at,
                     origin_country: newExport.origin_country,
                     rating: newExport.rating,
                     available_quantity: newExport.available_quantity,
-                    location: newExport.origin_country,
+                    location: newExport.address,
                 };
 
                 const productResult = await productCollection.insertOne(productData);
