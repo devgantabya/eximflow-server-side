@@ -3,7 +3,16 @@ const cors = require('cors');
 require('dotenv').config()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
+const admin = require("firebase-admin");
 const port = process.env.PORT || 5000;
+
+
+const serviceAccount = require("./eximflow-firebase-adminsdk.json");
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+
 
 app.use(cors());
 app.use(express.json());
@@ -12,15 +21,24 @@ const logger = (req, res, next) => {
     next();
 }
 
-const verifyFirebaseToken = (req, res, next) => {
+const verifyFirebaseToken = async (req, res, next) => {
     if (!req.headers.authorization) {
         return res.status(401).send({ message: "unauthorized access" });
     }
     const token = req.headers.authorization.split(" ")[1]
     if (!token) {
-        return res.status(401).send({ message: "unauthorized access" });
+        return res.status(401).send({ message: 'unauthorized access' });
     }
-    next();
+    //verify ID token
+    try {
+        const userInfo = await admin.auth().verifyIdToken(token);
+        req.token_email = userInfo.email;
+        next();
+    }
+    catch {
+        return res.status(401).send({ message: 'unauthorized access' });
+    }
+
 }
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.7smyhy0.mongodb.net/?appName=Cluster0`;
@@ -118,8 +136,11 @@ async function run() {
             res.send(result);
         })
 
-        app.get("/myImports", async (req, res) => {
+        app.get("/myImports",logger, verifyFirebaseToken, async (req, res) => {
             const email = req.query.email;
+            if (email !== req.token_email) {
+                return res.status(403).send({ message: 'Forbidden access' })
+            }
             const query = email ? { importer_email: email } : {};
             const result = await importsCollection.find(query).toArray();
             res.send(result);
@@ -150,6 +171,9 @@ async function run() {
 
         app.get("/exports", logger, verifyFirebaseToken, async (req, res) => {
             const email = req.query.email;
+            if (email !== req.token_email) {
+                return res.status(403).send({ message: 'Forbidden access' })
+            }
             const query = email ? { exporter_email: email } : {};
             const exportsData = await exportsCollection.find(query).toArray();
             res.send(exportsData);
