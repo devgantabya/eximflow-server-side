@@ -7,7 +7,8 @@ const admin = require("firebase-admin");
 const port = process.env.PORT || 5000;
 
 
-const serviceAccount = require("./eximflow-firebase-adminsdk.json");
+const decoded = Buffer.from(process.env.FIREBASE_SERVICE_KEY, "base64").toString("utf8");
+const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
@@ -51,9 +52,13 @@ const client = new MongoClient(uri, {
     }
 });
 
+app.get('/', (req, res) => {
+    res.send('Smart server is running')
+})
+
 async function run() {
     try {
-        await client.connect();
+        // await client.connect();
         const db = client.db("exim_db");
         const productCollection = db.collection("products");
         const usersCollection = db.collection("users");
@@ -136,7 +141,7 @@ async function run() {
             res.send(result);
         })
 
-        app.get("/myImports",logger, verifyFirebaseToken, async (req, res) => {
+        app.get("/myImports", logger, verifyFirebaseToken, async (req, res) => {
             const email = req.query.email;
             if (email !== req.token_email) {
                 return res.status(403).send({ message: 'Forbidden access' })
@@ -286,7 +291,7 @@ async function run() {
             res.send(exportDeleteResult);
         });
 
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // await client.close();
