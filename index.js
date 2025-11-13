@@ -8,6 +8,21 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+const logger = (req, res, next) => {
+    next();
+}
+
+const verifyFirebaseToken = (req, res, next) => {
+    if (!req.headers.authorization) {
+        return res.status(401).send({ message: "unauthorized access" });
+    }
+    const token = req.headers.authorization.split(" ")[1]
+    if (!token) {
+        return res.status(401).send({ message: "unauthorized access" });
+    }
+    next();
+}
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.7smyhy0.mongodb.net/?appName=Cluster0`;
 
 const client = new MongoClient(uri, {
@@ -133,7 +148,7 @@ async function run() {
             res.send(result);
         });
 
-        app.get("/exports", async (req, res) => {
+        app.get("/exports", logger, verifyFirebaseToken, async (req, res) => {
             const email = req.query.email;
             const query = email ? { exporter_email: email } : {};
             const exportsData = await exportsCollection.find(query).toArray();
